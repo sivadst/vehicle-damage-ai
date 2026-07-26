@@ -1,11 +1,17 @@
 import cv2
 import numpy as np
-import tensorflow as tf
 from PIL import Image
+
+try:
+    import tensorflow as tf
+    HAS_TF = True
+except ImportError:
+    HAS_TF = False
 
 def preprocess_image(image_file, target_size=(224, 224)):
     """
     Reads an uploaded file (PIL Image), resizes it, and applies EfficientNet preprocessing.
+    Falls back to simple normalization if TensorFlow is not available.
     """
     img = Image.open(image_file).convert('RGB')
     
@@ -20,8 +26,14 @@ def preprocess_image(image_file, target_size=(224, 224)):
     
     # Model input
     model_img = img.resize(target_size)
-    model_img = np.array(model_img)
-    model_img = tf.keras.applications.efficientnet.preprocess_input(model_img)
+    model_img = np.array(model_img, dtype=np.float32)
+    
+    if HAS_TF:
+        model_img = tf.keras.applications.efficientnet.preprocess_input(model_img)
+    else:
+        # Simple normalization fallback for demo mode
+        model_img = model_img / 127.5 - 1.0
+    
     model_img = np.expand_dims(model_img, axis=0)
     
     return display_img, model_img

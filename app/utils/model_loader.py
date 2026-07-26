@@ -1,12 +1,20 @@
 import streamlit as st
-import tensorflow as tf
 from pathlib import Path
 import pickle
+
+try:
+    import tensorflow as tf
+    HAS_TF = True
+except ImportError:
+    HAS_TF = False
 
 MODEL_DIR = Path("models")
 
 @st.cache_resource
 def load_cached_model():
+    if not HAS_TF:
+        st.error("TensorFlow is not installed. Real inference requires TensorFlow. Use Demo Mode instead.")
+        return None
     model_path = MODEL_DIR / 'efficientnet_b3_damage.h5'
     try:
         model = tf.keras.models.load_model(str(model_path))

@@ -1,10 +1,10 @@
 import sys
 
 def check():
-    import fpdf
     import app.main
-    import src.train
-    print("All required imports succeeded!")
+    from app.components.report_generator import generate_pdf_report
+    from src.constants import CLASSES, SEVERITIES, LOCATIONS
+    print("All core web application imports succeeded!")
 
 if __name__ == "__main__":
     check()

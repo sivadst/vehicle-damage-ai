@@ -15,7 +15,7 @@ from app.utils.image_processing import preprocess_image, overlay_heatmap
 from app.utils.gradcam_plusplus import apply_gradcam_plusplus
 from app.utils.cost_mapping import estimate_cost
 from app.components.report_generator import generate_pdf_report
-from src.train import CLASSES, SEVERITIES, LOCATIONS
+from src.constants import CLASSES, SEVERITIES, LOCATIONS
 
 # Ensure executor is available globally or per session
 if 'executor' not in st.session_state:

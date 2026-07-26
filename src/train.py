@@ -9,6 +9,7 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, ModelCheckpoint, TensorBoard
 
 from src.model import build_multitask_model
+from src.constants import CLASSES, SEVERITIES, LOCATIONS
 
 # Constants
 IMG_SIZE = (224, 224)
@@ -17,10 +18,6 @@ EPOCHS = 30
 DATA_DIR = Path("data/synthetic")
 METADATA_PATH = DATA_DIR / "metadata.csv"
 MODEL_DIR = Path("models")
-
-CLASSES = ["no_damage", "scratch", "dent", "broken_glass", "broken_lamp", "crushed_panel"]
-SEVERITIES = ["minor", "moderate", "severe"]
-LOCATIONS = ["front", "rear", "side", "roof", "multiple", "none"]
 
 def load_data():
     """Loads metadata and splits into train/val/test."""

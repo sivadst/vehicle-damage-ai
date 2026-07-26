@@ -1,10 +1,17 @@
 import numpy as np
-import tensorflow as tf
 import cv2
+
+try:
+    import tensorflow as tf
+    HAS_TF = True
+except ImportError:
+    HAS_TF = False
 
 def apply_gradcam_plusplus(model, img_array, class_index, layer_name='top_conv'):
     """
     Generates Grad-CAM++ heatmap for a specific class.
+    Requires TensorFlow to be installed.
+    
     Args:
         model: tf.keras.Model
         img_array: Preprocessed input image (1, 224, 224, 3)
@@ -13,6 +20,10 @@ def apply_gradcam_plusplus(model, img_array, class_index, layer_name='top_conv')
     Returns:
         heatmap: 2D numpy array [0, 1]
     """
+    if not HAS_TF:
+        # Return a blank heatmap if TF is not available
+        return np.zeros((224, 224), dtype=np.float32)
+    
     grad_model = tf.keras.models.Model(
         [model.inputs], 
         [model.get_layer(layer_name).output, model.output[0]] # index 0 is damage_type
