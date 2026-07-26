@@ -397,6 +397,20 @@ python -m src.feature_extractor
 
 ---
 
+## ⚠️ System Limitations & Production Considerations
+
+Being open about system boundaries and model trade-offs is a core software engineering principle. Users and deployment teams should consider the following:
+
+| Boundary / Limitation | Current Implementation | Production Roadmap / Mitigation |
+|:---|:---|:---|
+| **Classification vs. Segmentation** | Focuses on multi-task classification and Grad-CAM++ visual heatmaps rather than polygon mask segmentation. | Future v2 pipeline will incorporate Mask R-CNN / YOLOv8-seg for pixel-level damage area calculations ($\text{cm}^2$). |
+| **Synthetic Dataset Constraints** | Uses procedural OpenCV synthesis for zero-licensing demonstration capabilities. | Model weights should be fine-tuned on real insurer historical claims photos for optimal domain generalizability. |
+| **Heuristic Cost Mapping** | Repair ranges and labor durations are deterministic matrix lookups. | Production integration requires linking to real-time shop repair databases (e.g. CCC ONE, Mitchell, Audatex APIs). |
+| **Compound Damage Handling** | Assigns single primary damage category per impact zone. | Multi-label classification heads can be activated to detect overlapping damage (e.g. dent + scratch on same door panel). |
+| **Environmental Quality Dependency** | Low light or extreme mud/snow coverage flags warnings via the Quality Gatekeeper. | Pre-inference enhancement pipeline (CLAHE contrast equalization) and human adjuster review queues handle edge cases. |
+
+---
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please follow these steps:
