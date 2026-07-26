@@ -53,19 +53,24 @@
 
 ---
 
-## ✨ Key Features
+### 🛡️ Image Quality & Safety Gatekeeper
+Automated pre-inference image verification analyzing sharpness via **Laplacian variance** ($\sigma^2$), exposure level via luminance histograms, and minimum resolution checks before executing model inference.
 
 ### 🏗️ Multi-Task Learning Architecture
 A single EfficientNet-B3 backbone with shared feature extraction branching into three specialized classification heads — achieving **3× parameter efficiency** compared to training separate models.
 
-### 🧠 Explainable AI (Grad-CAM++)
-Insurance adjusters don't trust black boxes. Our Grad-CAM++ implementation generates pixel-level attention heatmaps, providing **visual evidence** of why the model made each prediction.
+### 🧠 Explainable AI (Grad-CAM++) & Opacity Blending
+Insurance adjusters don't trust black boxes. Our Grad-CAM++ engine generates spatial attention heatmaps with interactive opacity blending ($0.1 \rightarrow 0.9$), proving *why* predictions were made.
 
-### ⚡ Production-Ready Performance
-- `@st.cache_resource` for single-load model caching
-- `ThreadPoolExecutor` for non-blocking PDF generation
-- Custom CSS with glassmorphism design and micro-animations
+### ⏱️ Automated Claims Triage & Priority Scoring
+Computes cost ranges, labor duration estimates (business days), and triage priorities (`P1 - Critical`, `P2 - Standard`, `P3 - Routine`).
+
+### ⚡ Commercial SaaS UI & Session History
+- Glassmorphism design with responsive CSS variables & glowing status pills
 - Confidence threshold slider with automatic human-in-the-loop escalation
+- Session claims history tracking and comparison
+- `ThreadPoolExecutor` non-blocking PDF evidence report generation
+- `@st.cache_resource` single-load model caching
 
 ### 🟡 Demo Mode
 Fully functional mock-inference mode for instant demonstrations — no GPU, no dataset, no waiting. Toggle it off to run real model inference.
@@ -363,14 +368,19 @@ tensorboard --logdir outputs/logs
 
 ---
 
-## 🔧 Development
+## 🔧 Development & Testing
 
-### Running Checks
+### System Health & Import Check
 ```bash
 python run_checks.py
 ```
 
-### Training from Scratch
+### Automated Unit Test Suite
+```bash
+python -m unittest discover -s tests -p "test_*.py"
+```
+
+### Training & Data Pipeline
 ```bash
 # Generate synthetic dataset
 python src/data_pipeline.py

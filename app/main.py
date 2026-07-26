@@ -1,242 +1,367 @@
+"""
+Automated Vehicle Damage Assessment AI Application.
+
+Production Streamlit web application for:
+- Automated vehicle damage classification (6 categories)
+- Damage severity rating & impact location mapping
+- Image quality & safety gatekeeping (blur, brightness, resolution checks)
+- Explainable AI visual evidence (Grad-CAM++) with interactive opacity blending
+- Claims triage estimation (cost range, labor time, priority scoring)
+- Automated PDF report compilation & download
+"""
+
 import sys
 from pathlib import Path
 
-# Add root directory to sys.path for Streamlit Cloud deployment
+# Add project root directory to sys.path for Streamlit Cloud deployment
 ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-import streamlit as st
-import numpy as np
-import time
+import datetime
 import random
-import cv2
-from io import BytesIO
-from PIL import Image
-import plotly.graph_objects as go
-import pandas as pd
+import time
 from concurrent.futures import ThreadPoolExecutor
+from typing import Dict, Any, Tuple
 
-from app.components.style import inject_custom_css
-from app.utils.model_loader import load_cached_model, load_knn_index
-from app.utils.image_processing import preprocess_image, overlay_heatmap
-from app.utils.gradcam_plusplus import apply_gradcam_plusplus
-from app.utils.cost_mapping import estimate_cost
+import cv2
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
+from PIL import Image
+import streamlit as st
+
 from app.components.report_generator import generate_pdf_report
-from src.constants import CLASSES, SEVERITIES, LOCATIONS
+from app.components.style import inject_custom_css
+from app.utils.cost_mapping import estimate_cost, get_claim_triage_info
+from app.utils.gradcam_plusplus import apply_gradcam_plusplus
+from app.utils.image_processing import overlay_heatmap, preprocess_image
+from app.utils.model_loader import load_cached_model, load_knn_index
+from app.utils.quality_checker import assess_image_quality, ImageQualityResult
+from src.constants import CLASSES, LOCATIONS, SEVERITIES
 
-# Ensure executor is available globally or per session
+# Ensure executor is available globally in session state
 if 'executor' not in st.session_state:
     st.session_state.executor = ThreadPoolExecutor(max_workers=3)
 
-# Define mock functions for demo mode
-def mock_predict():
-    """Generates realistic mock predictions for demo purposes."""
+# Initialize prediction history tracking in session state
+if 'prediction_history' not in st.session_state:
+    st.session_state.prediction_history = []
+
+
+def mock_predict() -> Dict[str, Dict[str, Any]]:
+    """Generates realistic simulated prediction metrics for demonstration mode.
+
+    Returns:
+        Dict: Structured predictions for damage_type, severity, and location.
+    """
     dt = random.choices(CLASSES, weights=[0.05, 0.3, 0.4, 0.1, 0.05, 0.1], k=1)[0]
     sev = random.choices(SEVERITIES, weights=[0.2, 0.6, 0.2], k=1)[0]
     loc = random.choices(LOCATIONS, weights=[0.3, 0.2, 0.3, 0.05, 0.1, 0.05], k=1)[0]
-    
+
     return {
-        "damage_type": {"label": dt, "confidence": random.uniform(0.75, 0.96)},
-        "severity": {"label": sev, "confidence": random.uniform(0.65, 0.92)},
-        "location": {"label": loc, "confidence": random.uniform(0.50, 0.88)}
+        "damage_type": {"label": dt, "confidence": float(random.uniform(0.78, 0.96))},
+        "severity": {"label": sev, "confidence": float(random.uniform(0.70, 0.94))},
+        "location": {"label": loc, "confidence": float(random.uniform(0.65, 0.90))}
     }
 
-def mock_gradcam(img_array):
-    """Generates a fake heatmap focused on the lower center."""
-    h, w = img_array.shape[0], img_array.shape[1]
+
+def mock_gradcam(img_array: np.ndarray) -> np.ndarray:
+    """Generates a synthetic heatmap focused on damaged vehicle regions.
+
+    Args:
+        img_array (np.ndarray): Original image array.
+
+    Returns:
+        np.ndarray: 2D normalized heatmap [0, 1].
+    """
+    h, w = img_array.shape[:2]
     heatmap = np.zeros((h, w), dtype=np.float32)
-    center_y, center_x = int(h * 0.7), int(w * 0.5)
-    radius = int(min(h, w) * 0.3)
-    
+    center_y, center_x = int(h * 0.65), int(w * 0.5)
+    radius = int(min(h, w) * 0.28)
+
     Y, X = np.ogrid[:h, :w]
-    dist_from_center = np.sqrt((X - center_x)**2 + (Y - center_y)**2)
-    
+    dist_from_center = np.sqrt((X - center_x) ** 2 + (Y - center_y) ** 2)
+
     mask = dist_from_center <= radius
-    heatmap[mask] = 1 - (dist_from_center[mask] / radius)
+    heatmap[mask] = 1.0 - (dist_from_center[mask] / radius)
     return heatmap
 
-def build_confidence_chart(results):
-    fig = go.Figure(go.Bar(
-        x=[results['damage_type']['confidence'], results['severity']['confidence'], results['location']['confidence']],
-        y=['Damage Type', 'Severity', 'Location'],
-        orientation='h',
-        marker=dict(color=['#1f77b4', '#ff7f0e', '#2ca02c'])
-    ))
+
+def build_confidence_chart(results: Dict[str, Dict[str, Any]]) -> go.Figure:
+    """Builds a horizontal bar chart displaying prediction confidence scores.
+
+    Args:
+        results (Dict): Model prediction results dictionary.
+
+    Returns:
+        go.Figure: Configured Plotly figure object.
+    """
+    fig = go.Figure(
+        go.Bar(
+            x=[
+                results['damage_type']['confidence'],
+                results['severity']['confidence'],
+                results['location']['confidence']
+            ],
+            y=['Damage Type', 'Severity', 'Location'],
+            orientation='h',
+            marker=dict(color=['#2b6cb0', '#dd6b20', '#38a169']),
+            text=[
+                f"{results['damage_type']['confidence'] * 100:.1f}%",
+                f"{results['severity']['confidence'] * 100:.1f}%",
+                f"{results['location']['confidence'] * 100:.1f}%"
+            ],
+            textposition='auto'
+        )
+    )
     fig.update_layout(
-        title="Prediction Confidence",
-        xaxis=dict(title='Confidence', range=[0, 1], tickformat='.0%'),
+        title="Neural Network Prediction Confidence Breakdown",
+        xaxis=dict(title='Confidence Score', range=[0, 1], tickformat='.0%'),
         yaxis=dict(autorange="reversed"),
-        margin=dict(l=0, r=0, t=30, b=0),
-        height=200,
+        margin=dict(l=0, r=0, t=35, b=0),
+        height=220,
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)'
     )
     return fig
 
+
 def main():
-    st.set_page_config(page_title="Vehicle Damage AI", page_icon="🚗", layout="wide")
+    """Main Streamlit Application Entrypoint."""
+    st.set_page_config(
+        page_title="Vehicle Damage AI - Enterprise Claims Assessment",
+        page_icon="🚗",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+
     inject_custom_css()
-    
-    # Sidebar
+
+    # Sidebar Controls
     with st.sidebar:
-        st.image("app/assets/logo.png", width=150)
-        st.title("Settings")
-        demo_mode = st.toggle("🟡 Demo Mode (Mock Inference)", value=True, help="Use simulated predictions to avoid loading the full ML model.")
-        conf_threshold = st.slider("Confidence Threshold", 0.0, 1.0, 0.70, help="Flags predictions below this threshold for human review.")
-        
+        try:
+            st.image("app/assets/logo.png", width=140)
+        except Exception:
+            pass
+
+        st.title("Settings & Control")
+        demo_mode = st.toggle(
+            "🟡 Demo Mode (Mock Inference)",
+            value=True,
+            help="Simulate model inference without loading full TensorFlow neural net into memory."
+        )
+        conf_threshold = st.slider(
+            "Confidence Threshold",
+            min_value=0.50,
+            max_value=0.95,
+            value=0.70,
+            step=0.05,
+            help="Automated triage flag threshold. Predictions below this level trigger human review."
+        )
+
         st.divider()
-        st.subheader("Interview Explainability")
+        st.subheader("Explainability Settings")
+        heatmap_opacity = st.slider(
+            "Grad-CAM Opacity",
+            min_value=0.1,
+            max_value=0.9,
+            value=0.45,
+            step=0.05,
+            help="Adjust Grad-CAM++ heatmap overlay blending transparency."
+        )
+
+        st.divider()
         show_architecture = st.checkbox("Show Model Architecture")
-        
-        st.divider()
-        st.caption("v1.0.0 | Production Ready")
-        
-    # Main content
-    st.title("🚗 Automated Vehicle Damage Assessment")
-    st.markdown("Upload a vehicle image to instantly classify damage, assess severity, and generate a repair estimate.")
-    
+        st.caption("v1.2.0 | Production SaaS Edition")
+
+    # Main Hero Title
+    st.title("🚗 Automated Vehicle Damage AI")
+    st.markdown(
+        "Upload a vehicle inspection image for **instant multi-task classification**, "
+        "Explainable AI heatmap evidence, and automated repair cost triage."
+    )
+
     if demo_mode:
-        st.warning("🟡 **Demo Mode Active**: Using lightweight simulated inference for immediate demonstration.")
-        
-    uploaded_file = st.file_uploader("Upload Vehicle Image (JPG/PNG)", type=['jpg', 'jpeg', 'png'])
-    
+        st.warning("🟡 **Demo Mode Active**: Running lightweight simulated inference for high-speed demonstration.")
+
+    # Image Upload Section
+    uploaded_file = st.file_uploader(
+        "Upload Vehicle Damage Photo (JPG/PNG)",
+        type=['jpg', 'jpeg', 'png'],
+        help="Supports vehicle damage photos up to 10MB."
+    )
+
     if uploaded_file is not None:
-        col1, col2 = st.columns([1, 1.5])
-        
-        with col1:
-            st.subheader("Uploaded Image")
+        col_img, col_results = st.columns([1, 1.4])
+
+        with col_img:
+            st.subheader("📷 Input Image Analysis")
             display_img, model_input = preprocess_image(uploaded_file)
             st.image(display_img, use_container_width=True)
-            
-            analyze_btn = st.button("🔍 Analyze Damage", use_container_width=True)
-            
+
+            # Image Quality Gatekeeper Assessment
+            quality_res: ImageQualityResult = assess_image_quality(display_img)
+
+            with st.expander("🔍 Image Quality Assessment", expanded=not quality_res.is_valid):
+                q_col1, q_col2, q_col3 = st.columns(3)
+                q_col1.metric("Resolution", f"{quality_res.resolution[0]}x{quality_res.resolution[1]}")
+                q_col2.metric("Sharpness Score", f"{quality_res.blur_score:.1f}")
+                q_col3.metric("Luminance", f"{quality_res.brightness_score:.1f}")
+
+                if quality_res.warnings:
+                    for warn in quality_res.warnings:
+                        st.markdown(f'<div class="quality-banner">⚠️ {warn}</div>', unsafe_allow_html=True)
+                else:
+                    st.success("✅ Image quality is optimal for AI model inference.")
+
+            analyze_btn = st.button("🔍 Run Damage Assessment", use_container_width=True)
+
         if analyze_btn:
-            with col2:
-                # 1. Processing State
+            with col_results:
                 status_text = st.empty()
                 progress_bar = st.progress(0)
-                
-                status_text.text("⚙️ Loading model...")
-                progress_bar.progress(20)
-                
+
+                # Step 1: Model Initialization
+                status_text.text("⚙️ Initializing neural backbone...")
+                progress_bar.progress(25)
+
                 if not demo_mode:
                     model = load_cached_model()
                     if model is None:
                         st.stop()
-                time.sleep(0.3)
-                
-                status_text.text("🔍 Analyzing damage patterns...")
-                progress_bar.progress(50)
-                
+                time.sleep(0.2)
+
+                # Step 2: Multi-Task Classification
+                status_text.text("🧠 Executing Multi-Task EfficientNet inference...")
+                progress_bar.progress(55)
+
                 if demo_mode:
                     results = mock_predict()
-                    time.sleep(0.5)
+                    time.sleep(0.4)
                 else:
-                    preds = model.predict(model_input)
-                    dt_idx = np.argmax(preds[0][0])
-                    sev_idx = np.argmax(preds[1][0])
-                    loc_idx = np.argmax(preds[2][0])
-                    
+                    preds = model.predict(model_input, verbose=0)
+                    dt_idx = int(np.argmax(preds[0][0]))
+                    sev_idx = int(np.argmax(preds[1][0]))
+                    loc_idx = int(np.argmax(preds[2][0]))
+
                     results = {
                         "damage_type": {"label": CLASSES[dt_idx], "confidence": float(preds[0][0][dt_idx])},
                         "severity": {"label": SEVERITIES[sev_idx], "confidence": float(preds[1][0][sev_idx])},
                         "location": {"label": LOCATIONS[loc_idx], "confidence": float(preds[2][0][loc_idx])}
                     }
-                
-                status_text.text("🧠 Generating explainability heatmap...")
-                progress_bar.progress(80)
-                
+
+                # Step 3: Grad-CAM++ Visual Evidence Generation
+                status_text.text("🔥 Computing Grad-CAM++ spatial attention maps...")
+                progress_bar.progress(85)
+
                 if demo_mode:
                     heatmap = mock_gradcam(display_img)
-                    time.sleep(0.4)
+                    time.sleep(0.3)
                 else:
                     dt_idx = CLASSES.index(results['damage_type']['label'])
                     heatmap = apply_gradcam_plusplus(model, model_input, dt_idx)
-                
-                superimposed, colored_heatmap = overlay_heatmap(display_img, heatmap)
-                
+
+                superimposed, colored_heatmap = overlay_heatmap(display_img, heatmap, alpha=heatmap_opacity)
+
                 progress_bar.progress(100)
                 status_text.empty()
                 progress_bar.empty()
-                
-                # 2. Results Display
-                st.subheader("Assessment Results")
-                
-                # Risk Badge
+
+                # Results Presentation Block
+                st.subheader("📊 Assessment & Claims Triage Results")
+
                 sev_label = results['severity']['label'].lower()
                 badge_class = "badge-minor" if sev_label == "minor" else "badge-moderate" if sev_label == "moderate" else "badge-severe"
-                risk_text = "🟢 Approve (Low Risk)" if sev_label == "minor" else "🟡 Review (Medium Risk)" if sev_label == "moderate" else "🔴 Escalate (High Risk)"
-                
-                st.markdown(f'<div class="result-card">', unsafe_allow_html=True)
-                
-                metrics_col1, metrics_col2, metrics_col3 = st.columns(3)
-                metrics_col1.metric("Damage Type", results['damage_type']['label'].replace("_", " ").title())
-                metrics_col2.metric("Severity", results['severity']['label'].title())
-                metrics_col3.metric("Location", results['location']['label'].title())
-                
+                risk_text = "🟢 Auto-Approve (Low Risk)" if sev_label == "minor" else "🟡 Standard Triage (Medium Risk)" if sev_label == "moderate" else "🔴 Escalate (High Severity)"
+
+                st.markdown('<div class="result-card">', unsafe_allow_html=True)
+
+                m_col1, m_col2, m_col3 = st.columns(3)
+                m_col1.metric("Damage Type", results['damage_type']['label'].replace("_", " ").title())
+                m_col2.metric("Severity Level", results['severity']['label'].title())
+                m_col3.metric("Impact Location", results['location']['label'].title())
+
                 st.markdown(f'<span class="badge {badge_class}">{risk_text}</span>', unsafe_allow_html=True)
-                
-                # Check threshold
-                if any(r['confidence'] < conf_threshold for r in results.values()):
-                    st.warning(f"⚠️ Confidence below threshold ({conf_threshold*100:.0f}%). Human review required.")
-                    
-                cost = estimate_cost(results['damage_type']['label'], results['severity']['label'])
-                st.success(f"**Estimated Repair Cost:** {cost}")
-                
+
+                # Human Review Threshold Check
+                low_conf_heads = [k for k, v in results.items() if v['confidence'] < conf_threshold]
+                if low_conf_heads:
+                    st.markdown(
+                        f'<div class="escalation-banner">⚠️ <strong>Human Adjuster Review Required</strong>: '
+                        f'Confidence for ({", ".join(low_conf_heads)}) is below target threshold ({conf_threshold * 100:.0f}%).</div>',
+                        unsafe_allow_html=True
+                    )
+
+                # Triage Matrix Lookup
+                triage_info = get_claim_triage_info(results['damage_type']['label'], results['severity']['label'])
+
+                st.divider()
+                t_col1, t_col2, t_col3 = st.columns(3)
+                t_col1.metric("Estimated Cost", triage_info['cost'])
+                t_col2.metric("Est. Labor Time", triage_info['time'])
+                t_col3.metric("Priority Level", triage_info['priority'])
+
                 st.markdown('</div>', unsafe_allow_html=True)
-                
-                # 3. Explainability
-                st.subheader("Model Explainability (Grad-CAM++)")
-                cam_col1, cam_col2 = st.columns(2)
-                cam_col1.image(superimposed, caption="Attention Overlay", use_container_width=True)
-                cam_col2.image(colored_heatmap, caption="Heatmap Only", use_container_width=True)
-                
-                with st.expander("Why This Prediction?"):
-                    st.write(f"The AI focused on the highlighted regions (red/yellow) to determine the damage type is **{results['damage_type']['label'].replace('_', ' ')}**.")
+
+                # Session History Log
+                st.session_state.prediction_history.append({
+                    "timestamp": datetime.datetime.now().strftime("%H:%M:%S"),
+                    "damage": results['damage_type']['label'].replace("_", " ").title(),
+                    "severity": results['severity']['label'].title(),
+                    "cost": triage_info['cost'],
+                    "confidence": f"{results['damage_type']['confidence'] * 100:.0f}%"
+                })
+
+                # Tabs for Deep Dive & Report Generation
+                tab_xai, tab_history = st.tabs(["🧠 Explainability & Charts", "📜 Session Claims History"])
+
+                with tab_xai:
+                    cam_c1, cam_c2 = st.columns(2)
+                    cam_c1.image(superimposed, caption=f"Attention Overlay (Opacity: {heatmap_opacity:.2f})", use_container_width=True)
+                    cam_c2.image(colored_heatmap, caption="Raw Grad-CAM++ Activation", use_container_width=True)
+
                     st.plotly_chart(build_confidence_chart(results), use_container_width=True)
-                    
-                    if demo_mode:
-                        st.info("Similar cases from database (Mock Data):")
-                        sim_cols = st.columns(3)
-                        sim_cols[0].image("app/assets/logo.png", caption="Case 1 (0.89)")
-                        sim_cols[1].image("app/assets/logo.png", caption="Case 2 (0.84)")
-                        sim_cols[2].image("app/assets/logo.png", caption="Case 3 (0.81)")
-                    else:
-                        knn, meta = load_knn_index()
-                        if knn is not None:
-                            # In reality, we'd extract features here. Mocking the UI part of it for brevity if not demo mode.
-                            st.info("KNN Retrieval requires live feature extraction.")
-                            
-                # 4. Report Generation
-                # Use threading to generate PDF without blocking
-                with st.spinner("Preparing PDF Report..."):
+
+                with tab_history:
+                    if st.session_state.prediction_history:
+                        df_hist = pd.DataFrame(st.session_state.prediction_history)
+                        st.dataframe(df_hist, use_container_width=True)
+
+                # PDF Report Download Button
+                with st.spinner("Compiling PDF Claim Evidence Report..."):
                     img_bytes = cv2.imencode('.jpg', cv2.cvtColor(colored_heatmap, cv2.COLOR_BGR2RGB))[1].tobytes()
-                    future = st.session_state.executor.submit(generate_pdf_report, None, img_bytes, results, cost)
+                    future = st.session_state.executor.submit(
+                        generate_pdf_report,
+                        None,
+                        img_bytes,
+                        results,
+                        triage_info['cost'],
+                        triage_info
+                    )
                     pdf_bytes = future.result(timeout=15)
-                    
+
                 st.download_button(
                     label="📄 Download Assessment Report (PDF)",
                     data=pdf_bytes,
-                    file_name="Vehicle_Damage_Report.pdf",
+                    file_name=f"Damage_Report_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
                     mime="application/pdf",
                     use_container_width=True
                 )
-                
+
     if show_architecture:
         st.divider()
-        st.subheader("Technical Architecture Deep Dive")
+        st.subheader("Technical System Architecture")
         st.markdown("""
-        **Model Backbone:** EfficientNet-B3 (Transfer Learning from ImageNet)\n
-        **Why EfficientNet?** It offers an optimal balance of accuracy and parameter efficiency compared to ResNet.
-        
-        **Multi-Task Head:**
-        - **Branch 1:** Damage Type (6 classes) - Uses Focal Loss to handle extreme class imbalances.
-        - **Branch 2:** Severity (3 classes)
-        - **Branch 3:** Location (5 classes)
-        
-        *Shared visual features between tasks reduce overall inference time and parameter count compared to three distinct models.*
+        **Model Backbone:** EfficientNet-B3 (Transfer Learning from ImageNet)  
+        **Multi-Task Heads:**
+        - **Branch 1:** Damage Type Classification (6 classes)
+        - **Branch 2:** Severity Assessment (3 classes)
+        - **Branch 3:** Location Prediction (5 classes)  
+
+        **Explainability Engine:** Grad-CAM++ with 2nd/3rd order gradient linearization.
         """)
+
 
 if __name__ == "__main__":
     main()
