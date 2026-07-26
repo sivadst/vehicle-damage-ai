@@ -24,6 +24,14 @@
   <img src="https://img.shields.io/badge/Deployment-Docker%20|%20Cloud%20Run%20|%20Streamlit%20Cloud-purple?style=flat-square" alt="Deploy"/>
 </p>
 
+<p align="center">
+  <a href="https://vehicle-damage.streamlit.app"><img src="https://img.shields.io/badge/🚀_Live_Demo-vehicle--damage.streamlit.app-FF4B4B?style=for-the-badge" alt="Live Demo"/></a>
+</p>
+
+<p align="center">
+  <strong>👉 <a href="https://vehicle-damage.streamlit.app">Try the Live Demo</a> 👈</strong>
+</p>
+
 ---
 
 ## 🎯 The Problem
