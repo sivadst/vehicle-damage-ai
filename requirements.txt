@@ -1,0 +1,28 @@
+# ========================================
+# Vehicle Damage AI - Dependencies
+# ========================================
+# Core Framework
+streamlit>=1.36.0
+tensorflow>=2.16.1
+
+# Computer Vision
+opencv-python-headless>=4.9.0
+Pillow>=10.3.0
+
+# Data & ML
+numpy>=1.26.0
+pandas>=2.2.0
+scikit-learn>=1.4.0
+
+# Visualization
+matplotlib>=3.8.0
+seaborn>=0.13.0
+plotly>=5.20.0
+
+# Reporting & UI
+fpdf2>=2.7.0
+streamlit-lottie>=0.0.5
+qrcode>=7.4.0
+
+# Progress
+tqdm>=4.66.0
