@@ -1,0 +1,42 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+dist
+build
+venv
+.venv
+env
+
+# IDE
+.vscode
+.idea
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Generated data (large files)
+data/synthetic/**/*.jpg
+data/synthetic/**/*.png
+
+# ML Artifacts (mount via volumes instead)
+models/
+outputs/
+
+# Documentation (not needed in container)
+*.md
+!README.md
+LICENSE
+
+# Docker
+Dockerfile
+docker-compose.yml
+docker-compose.override.yml
+.dockerignore
