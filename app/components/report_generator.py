@@ -58,4 +58,4 @@ def generate_pdf_report(image_path_or_bytes, heatmap_bytes, results, cost_estima
     except:
         pass
         
-    return pdf.output(dest="S").encode("latin-1")
+    return bytes(pdf.output())
