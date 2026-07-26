@@ -1,0 +1,63 @@
+# ========================================
+# Vehicle Damage AI - .gitignore
+# ========================================
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+eggs/
+*.manifest
+*.spec
+
+# === Virtual Environments ===
+venv/
+env/
+.venv/
+.env
+
+# === IDE ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# === Jupyter ===
+.ipynb_checkpoints/
+
+# === Generated Data ===
+data/synthetic/**/*.jpg
+data/synthetic/**/*.png
+
+# === ML Artifacts ===
+*.h5
+*.pkl
+*.hdf5
+*.pb
+*.tflite
+*.onnx
+models/
+outputs/
+
+# === Streamlit Secrets ===
+.streamlit/secrets.toml
+
+# === Docker ===
+docker-compose.override.yml
+
+# === Logs ===
+*.log
+logs/
+
+# === OS ===
+.DS_Store
+Thumbs.db
+desktop.ini
