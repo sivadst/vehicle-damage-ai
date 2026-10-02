@@ -130,11 +130,44 @@ def build_confidence_chart(results: Dict[str, Dict[str, Any]]) -> go.Figure:
 def main():
     """Main Streamlit Application Entrypoint."""
     st.set_page_config(
-        page_title="Vehicle Damage AI - Enterprise Claims Assessment",
+        page_title="Vehicle Damage AI - AI-Powered Damage Assessment",
         page_icon="🚗",
         layout="wide",
-        initial_sidebar_state="expanded"
+        initial_sidebar_state="collapsed"
     )
+
+    # Check for classic mode query parameter
+    params = st.query_params
+    use_classic = params.get("mode") == "classic"
+
+    dashboard_file = Path(__file__).resolve().parent / "dashboard.html"
+    if dashboard_file.exists() and not use_classic:
+        st.markdown("""
+            <style>
+            #MainMenu, header, footer { visibility: hidden !important; height: 0 !important; }
+            .stAppDeployButton { display: none !important; }
+            div[data-testid="stToolbar"] { display: none !important; }
+            div[data-testid="stDecoration"] { display: none !important; }
+            div[data-testid="stStatusWidget"] { display: none !important; }
+            section[data-testid="stSidebar"] { display: none !important; }
+            .block-container {
+                padding: 0 !important;
+                margin: 0 !important;
+                max-width: 100% !important;
+            }
+            iframe {
+                border: none !important;
+                width: 100% !important;
+                height: 100vh !important;
+                display: block;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+        import streamlit.components.v1 as components
+        with open(dashboard_file, "r", encoding="utf-8") as f:
+            html_content = f.read()
+        components.html(html_content, height=1050, scrolling=True)
+        return
 
     inject_custom_css()
 
