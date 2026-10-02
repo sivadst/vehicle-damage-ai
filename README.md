@@ -25,11 +25,14 @@
 </p>
 
 <p align="center">
-  <a href="https://vehicle-damage.streamlit.app"><img src="https://img.shields.io/badge/🚀_Live_Demo-vehicle--damage.streamlit.app-FF4B4B?style=for-the-badge" alt="Live Demo"/></a>
+  <a href="https://sivadst.github.io/vehicle-damage-ai/"><img src="https://img.shields.io/badge/🌐_Web_Dashboard-GitHub_Pages-2563EB?style=for-the-badge&logo=githubpages&logoColor=white" alt="Web Dashboard"/></a>
+  &nbsp;
+  <a href="https://vehicle-damage.streamlit.app"><img src="https://img.shields.io/badge/🚀_Streamlit_App-vehicle--damage.streamlit.app-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white" alt="Streamlit App"/></a>
 </p>
 
 <p align="center">
-  <strong>👉 <a href="https://vehicle-damage.streamlit.app">Try the Live Demo</a> 👈</strong>
+  <strong>👉 <a href="https://sivadst.github.io/vehicle-damage-ai/">Interactive Web Dashboard</a></strong> &nbsp;|&nbsp; 
+  <strong>👉 <a href="https://vehicle-damage.streamlit.app">Streamlit Cloud App</a></strong>
 </p>
 
 ---
@@ -263,7 +266,13 @@ docker run -p 8501:8501 vehicle-damage-ai
 Open **http://localhost:8501** 🐳
 
 ---
-https://vehicle-damage.streamlit.app
+
+### 🌐 Live Deployment Links
+- **Interactive Web Dashboard (GitHub Pages)**: [https://sivadst.github.io/vehicle-damage-ai/](https://sivadst.github.io/vehicle-damage-ai/)
+- **Streamlit ML Application (Streamlit Cloud)**: [https://vehicle-damage.streamlit.app](https://vehicle-damage.streamlit.app)
+
+---
+
 ## 📖 Usage Guide
 
 ### 1. Upload an Image
